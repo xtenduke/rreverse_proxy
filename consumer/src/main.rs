@@ -3,19 +3,19 @@ use std::io::{Read, Write};
 use std::str::from_utf8;
 
 fn main() {
-    match TcpStream::connect("localhost:8000") {
+    match TcpStream::connect("localhost:3001") {
         Ok(mut stream) => {
             println!("Successfully connected to server in port 3001");
 
             // valid http/1.1 request
-            let msg = b"GET /index.html HTTP/1.1
+            let msg = b"GET / HTTP/1.0
 
                 ";
 
             stream.write(msg).unwrap();
             println!("Sent Hello, awaiting reply...");
 
-            let mut data = [0 as u8; 1024]; // using 1024 byte buffer
+            let mut data = [0 as u8; 1024*1024]; // using 1024 byte buffer
             match stream.read(&mut data) {
                 Ok(_) => {
                     let text = from_utf8(&data).unwrap();

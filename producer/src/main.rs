@@ -4,34 +4,23 @@ use std::net::{TcpListener, TcpStream};
 use std::io::{Read, Write};
 
 fn handle_client(mut client_stream: TcpStream) {
-    let mut buffer = [0 as u8; 1024]; // using 1024 byte buffer
+    let mut request_buffer = [0 as u8; 1024];
+    let mut target_stream = TcpStream::connect("localhost:3000").expect("Failed connecting to dest");
     loop {
-        let n = client_stream.read(&mut buffer).expect("Socket read failed");
-
-        // open a tcp connection to the target - send data back over original TCP connection
-        match TcpStream::connect("localhost:8000") {
-            Ok(mut target_stream) => {
-                println!("Connected to target");
-                // forward the original request to the target
-                target_stream.write(&buffer[0..n]).unwrap();
-                let client_request = from_utf8(&buffer).unwrap();
-                println!("Forwarded request to target: {}", client_request);
-                let mut data = [0 as u8; 1024]; // 1024 byte buff
-                match target_stream.read(&mut data) {
-                    Ok(_) => {
-                        let target_response = from_utf8(&data).unwrap();
-                        println!("Received target data: {}", target_response);
-                        // return the response from the target back to the original client
-                        client_stream.write_all(&data[0..n]).expect("Socket write failed");
-                        println!("Write data to client stream");
-                    },
-                    Err(e) => {
-                        println!("Target failed: {}", e);
-                    }
-                }
+        let n = client_stream.read(&mut request_buffer).expect("Socket read failed");
+        println!("Connected to target");
+        // forward the original request to the target
+        target_stream.write(&request_buffer[0..n]).unwrap();
+        let client_request = from_utf8(&request_buffer).unwrap();
+        println!("Forwarded request to target: {}", client_request);
+        let mut data = Vec::new();
+        match target_stream.read_to_end(&mut data) {
+            Ok(_) => {
+                client_stream.write_all(&data).expect("TODO: panic message");
+                println!("Write data to client stream, size {} bytes", data.len());
             },
             Err(e) => {
-                println!("Target connection failed: {}", e);
+                println!("Target failed: {}", e);
             }
         }
 
@@ -52,6 +41,7 @@ fn main() {
                 println!("New connection: {}", stream.peer_addr().unwrap());
                 thread::spawn(move|| {
                     // connection succeeded
+                    // need to reference these threads?
                     handle_client(stream)
                 });
             }
