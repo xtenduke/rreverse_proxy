@@ -19,14 +19,14 @@ fn handle_client(client_stream: TcpStream) {
 fn cross_streams(mut source: TcpStream, mut destination: TcpStream) {
     // writes from source to destination
     loop {
-        let mut buffer = [0 as u8; 1024*1024];
-        let n = source.read(&mut buffer);
+        let mut temp_buffer = [0 as u8; 1024*1024]; // todo: average chunk size?
+        let n = source.read(&mut temp_buffer);
         match n {
             Ok(0) => {
                 return;
             }
             Ok(_) => {
-                destination.write_all(&buffer).unwrap();
+                destination.write(&temp_buffer[0..n.unwrap()]).unwrap();
             }
             Err(_) => {
                 return;
