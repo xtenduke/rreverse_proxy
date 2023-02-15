@@ -1,0 +1,9 @@
+
+Producer
+- produces the TCP stream to be consumed (i.e. a web server behind a firewall)
+- Connects to consumer
+
+Consumer
+- consumes the TCP content. i.e. a browser
+- Hosts a public TCP server which the producer connects to
+- Hosts a local TCP server which receives data and sends to producer
