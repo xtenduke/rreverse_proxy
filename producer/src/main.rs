@@ -5,8 +5,8 @@ use std::thread::spawn;
 fn handle_client(client_stream: TcpStream) {
     let server_stream = TcpStream::connect("localhost:3000").expect("Failed to open target connection");
 
-    let client_read = client_stream.try_clone().unwrap();
-    let server_read = server_stream.try_clone().unwrap(); // todo: error handle
+    let client_read = client_stream.try_clone().expect("Failed to clone client");
+    let server_read = server_stream.try_clone().expect("Failed to clone server"); // todo: error handle
     spawn(move|| {
         cross_streams(client_read, server_stream);
     });
@@ -19,16 +19,20 @@ fn handle_client(client_stream: TcpStream) {
 fn cross_streams(mut source: TcpStream, mut destination: TcpStream) {
     // writes from source to destination
     loop {
-        let mut temp_buffer = [0 as u8; 1024*1024]; // todo: average chunk size?
-        let n = source.read(&mut temp_buffer);
-        match n {
+        // support 1MB...  probably not supporting much of the HTTP spec..
+        // should implement growable buffer
+        let mut temp_buffer = [0 as u8; 1024*1024];
+        let read_result = source.read(&mut temp_buffer);
+        match read_result {
             Ok(0) => {
                 return;
             }
-            Ok(_) => {
-                destination.write(&temp_buffer[0..n.unwrap()]).unwrap();
+            Ok(size) => {
+                // write only what was read from 
+                destination.write(&temp_buffer[0..size]).unwrap();
             }
-            Err(_) => {
+            Err(error) => {
+                println!("Error reading from stream {}", error);
                 return;
             }
         }
