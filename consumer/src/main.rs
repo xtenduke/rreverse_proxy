@@ -1,34 +1,64 @@
-use std::net::TcpStream;
+use std::net::{TcpListener, TcpStream};
 use std::io::{Read, Write};
-use std::str::from_utf8;
+use std::thread::spawn;
 
-fn main() {
-    match TcpStream::connect("localhost:3001") {
-        Ok(mut stream) => {
-            println!("Successfully connected to server in port 3001");
+fn handle_client(client_stream: TcpStream, proxy_link: TcpStream) {
+    // read from the client_stream.. write directly to the proxy_link
+    // read from the proxy_link.. write directly to the client_stream
 
-            // valid http/1.1 request
-            let msg = b"GET / HTTP/1.0
+    let client_read = client_stream.try_clone().expect("Failed to clone client");
+    let proxy_read = proxy_link.try_clone().expect("Failed to clone server"); // todo: error handle
+    spawn(move|| {
+        cross_streams(client_read, proxy_link);
+    });
 
-                ";
+    spawn(move|| {
+        cross_streams(proxy_read, client_stream)
+    });
+}
 
-            stream.write(msg).unwrap();
-            println!("Sent Hello, awaiting reply...");
-
-            let mut data = [0 as u8; 1024*1024]; // using 1024 byte buffer
-            match stream.read(&mut data) {
-                Ok(_) => {
-                    let text = from_utf8(&data).unwrap();
-                    println!("got response: {}", text);
-                },
-                Err(e) => {
-                    println!("Failed to receive data: {}", e);
-                }
+fn cross_streams(mut source: TcpStream, mut destination: TcpStream) {
+    // writes from source to destination
+    loop {
+        // support 1MB...  probably not supporting much of the HTTP spec..
+        // should implement growable buffer
+        let mut temp_buffer = [0 as u8; 1024*1024];
+        let read_result = source.read(&mut temp_buffer);
+        match read_result {
+            Ok(0) => {
+                return;
             }
-        },
-        Err(e) => {
-            println!("Failed to connect: {}", e);
+            Ok(size) => {
+                // write only what was read from 
+                destination.write(&temp_buffer[0..size]).unwrap();
+            }
+            Err(error) => {
+                println!("Error reading from stream {}", error);
+                return;
+            }
         }
     }
-    println!("Terminated.");
+}
+
+fn main() {
+    let proxy_server = TcpListener::bind("0.0.0.0:4000").unwrap();
+    let proxy_link = proxy_server.incoming().take(1);
+
+    let listener = TcpListener::bind("0.0.0.0:3001").unwrap();
+    // accept connections and process them, spawning a new thread for each one
+    println!("Server listening on port 3001");
+    for stream in listener.incoming() {
+        match stream {
+            Ok(stream) => {
+                println!("New connection: {}", stream.peer_addr().unwrap());
+                handle_client(stream, proxy_link);
+            }
+            Err(e) => {
+                println!("Error: {}", e);
+                /* connection failed */
+            }
+        }
+    }
+    // close the socket server
+    drop(listener);
 }
