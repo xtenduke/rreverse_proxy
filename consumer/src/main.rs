@@ -29,6 +29,7 @@ fn cross_streams(mut source: TcpStream, mut destination: TcpStream) {
                 return;
             }
             Ok(size) => {
+                println!("Reading.....");
                 // write only what was read from 
                 destination.write(&temp_buffer[0..size]).unwrap();
             }
@@ -42,16 +43,17 @@ fn cross_streams(mut source: TcpStream, mut destination: TcpStream) {
 
 fn main() {
     let proxy_server = TcpListener::bind("0.0.0.0:4000").unwrap();
-    let proxy_link = proxy_server.incoming().take(1);
+    let proxy_link = proxy_server.incoming().next().unwrap().expect(""); // TODO: error and backoff handle
 
     let listener = TcpListener::bind("0.0.0.0:3001").unwrap();
     // accept connections and process them, spawning a new thread for each one
     println!("Server listening on port 3001");
     for stream in listener.incoming() {
+        let temp_proxy_link = proxy_link.try_clone().unwrap();
         match stream {
             Ok(stream) => {
                 println!("New connection: {}", stream.peer_addr().unwrap());
-                handle_client(stream, proxy_link);
+                handle_client(stream, temp_proxy_link);
             }
             Err(e) => {
                 println!("Error: {}", e);

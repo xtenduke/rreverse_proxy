@@ -1,7 +1,6 @@
-
 Producer
 - produces the TCP stream to be consumed (i.e. a web server behind a firewall)
-- Connects to consumer
+- Connects to consumers TCP server
 
 Consumer
 - consumes the TCP content. i.e. a browser
